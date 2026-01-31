@@ -1,0 +1,19 @@
+# Environment
+.env
+venv/
+__pycache__/
+*.pyc
+
+# Output
+output/
+
+# IDE
+.vscode/
+.idea/
+
+# Claude
+.claude/
+
+# Markdown (except README)
+*.md
+!README.md
