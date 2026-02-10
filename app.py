@@ -2,16 +2,13 @@ import os
 import uuid
 import threading
 from flask import Flask, render_template, request, jsonify, send_file
-from services.text_processor import create_clips, estimate_duration
 from services.sora_client import SoraClient
-from services.video_processor import VideoProcessor
-from services.story_processor import StoryProcessor
-from config import OUTPUT_DIR, CLIP_DURATION
+from config import OUTPUT_DIR
 
 app = Flask(__name__)
 
-# Store job status in memory (for simplicity)
-jobs = {}
+# Store clip status in memory
+clips = {}
 
 
 @app.route("/")
@@ -20,175 +17,106 @@ def index():
     return render_template("index.html")
 
 
-@app.route("/api/process-text", methods=["POST"])
-def process_text():
-    """Process input text and return clip breakdown."""
+@app.route("/api/generate-clip", methods=["POST"])
+def generate_clip():
+    """Start generation for a single clip."""
     data = request.get_json()
-    text = data.get("text", "").strip()
-    style = data.get("style", "").strip()
-    clip_duration = data.get("clip_duration", CLIP_DURATION)
-    max_clips = data.get("max_clips", 5)
+    prompt = data.get("prompt", "").strip()
+    duration = data.get("duration", 4)
 
-    if not text:
-        return jsonify({"error": "No text provided"}), 400
+    if not prompt:
+        return jsonify({"error": "No prompt provided"}), 400
 
-    clips = create_clips(text, style, max_clips)
-    duration = estimate_duration(clips, clip_duration)
+    if duration not in [4, 8, 12]:
+        return jsonify({"error": "Duration must be 4, 8, or 12"}), 400
 
-    return jsonify({
-        "clips": clips,
-        "total_clips": len(clips),
-        "estimated_duration": duration,
-        "clip_duration": clip_duration,
-        "style": style,
-    })
+    clip_id = str(uuid.uuid4())[:8]
 
-
-@app.route("/api/generate", methods=["POST"])
-def generate():
-    """Start video generation job."""
-    data = request.get_json()
-    clips = data.get("clips", [])
-    clip_duration = data.get("clip_duration", CLIP_DURATION)
-    global_style = data.get("global_style", "")
-
-    if not clips:
-        return jsonify({"error": "No clips provided"}), 400
-
-    # Create job ID
-    job_id = str(uuid.uuid4())[:8]
-
-    # Initialize job status
-    jobs[job_id] = {
-        "status": "queued",
-        "progress": 0,
-        "total_clips": len(clips),
-        "current_clip": 0,
-        "clips": clips,
-        "clip_duration": clip_duration,
-        "global_style": global_style,
-        "results": [],
-        "output_path": None,
+    clips[clip_id] = {
+        "status": "generating",
+        "prompt": prompt,
+        "duration": duration,
+        "video_path": None,
         "error": None,
     }
 
-    # Start generation in background thread
-    thread = threading.Thread(target=run_generation, args=(job_id, clips, clip_duration, global_style))
+    thread = threading.Thread(target=_run_clip_generation, args=(clip_id, prompt, duration))
     thread.start()
 
-    return jsonify({"job_id": job_id, "status": "queued"})
+    return jsonify({"clip_id": clip_id, "status": "generating"})
 
 
-def run_generation(job_id: str, clips: list, clip_duration: int = 4, global_style: str = ""):
-    """Run video generation in background."""
+def _run_clip_generation(clip_id: str, prompt: str, duration: int):
+    """Generate a single clip in a background thread."""
     try:
-        jobs[job_id]["status"] = "processing"
-        jobs[job_id]["progress"] = 5
+        sora = SoraClient(clip_duration=duration)
+        clip_data = {"id": 1, "visual_prompt": prompt}
+        result = sora.generate_clip(clip_data, clip_id)
 
-        # Step 1: Enhance prompts with GPT for consistency
-        story_processor = StoryProcessor()
-        enhanced_clips = story_processor.enhance_prompts(clips, global_style)
-        jobs[job_id]["clips"] = enhanced_clips  # Store enhanced clips
-
-        jobs[job_id]["status"] = "generating"
-        jobs[job_id]["progress"] = 10
-
-        # Initialize clients
-        sora = SoraClient(clip_duration=clip_duration)
-        processor = VideoProcessor()
-
-        # Progress callback
-        def progress_callback(current, total, clip_id):
-            jobs[job_id]["current_clip"] = current
-            jobs[job_id]["progress"] = 10 + int((current / total) * 70)  # 10-80% for generation
-
-        # Generate all clips
-        results = sora.generate_all_clips(enhanced_clips, job_id, progress_callback)
-        jobs[job_id]["results"] = results
-
-        # Check if any clips succeeded
-        successful = [r for r in results if r["status"] == "completed"]
-        if not successful:
-            jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = "All clip generations failed"
-            return
-
-        # Process video (concatenate and add captions)
-        jobs[job_id]["status"] = "processing"
-        jobs[job_id]["progress"] = 85
-
-        final_result = processor.process_video(results, clips, job_id)
-
-        if final_result["status"] == "completed":
-            jobs[job_id]["status"] = "completed"
-            jobs[job_id]["progress"] = 100
-            jobs[job_id]["output_path"] = final_result["output_path"]
+        if result["status"] == "completed":
+            clips[clip_id]["status"] = "completed"
+            clips[clip_id]["video_path"] = result["video_path"]
         else:
-            jobs[job_id]["status"] = "failed"
-            jobs[job_id]["error"] = final_result.get("error", "Processing failed")
-
+            clips[clip_id]["status"] = "failed"
+            clips[clip_id]["error"] = result.get("error", "Generation failed")
     except Exception as e:
-        jobs[job_id]["status"] = "failed"
-        jobs[job_id]["error"] = str(e)
+        clips[clip_id]["status"] = "failed"
+        clips[clip_id]["error"] = str(e)
 
 
-@app.route("/api/status/<job_id>")
-def get_status(job_id):
-    """Get job status."""
-    if job_id not in jobs:
-        return jsonify({"error": "Job not found"}), 404
+@app.route("/api/clip-status/<clip_id>")
+def clip_status(clip_id):
+    """Get status for a single clip."""
+    if clip_id not in clips:
+        return jsonify({"error": "Clip not found"}), 404
 
-    job = jobs[job_id]
+    clip = clips[clip_id]
     return jsonify({
-        "job_id": job_id,
-        "status": job["status"],
-        "progress": job["progress"],
-        "current_clip": job["current_clip"],
-        "total_clips": job["total_clips"],
-        "error": job["error"],
+        "clip_id": clip_id,
+        "status": clip["status"],
+        "error": clip["error"],
     })
 
 
-@app.route("/api/download/<job_id>")
-def download(job_id):
-    """Download the generated video."""
-    if job_id not in jobs:
-        return jsonify({"error": "Job not found"}), 404
+@app.route("/api/download-clip/<clip_id>")
+def download_clip(clip_id):
+    """Download a generated clip."""
+    if clip_id not in clips:
+        return jsonify({"error": "Clip not found"}), 404
 
-    job = jobs[job_id]
+    clip = clips[clip_id]
 
-    if job["status"] != "completed":
-        return jsonify({"error": "Video not ready"}), 400
+    if clip["status"] != "completed":
+        return jsonify({"error": "Clip not ready"}), 400
 
-    if not job["output_path"] or not os.path.exists(job["output_path"]):
+    if not clip["video_path"] or not os.path.exists(clip["video_path"]):
         return jsonify({"error": "Video file not found"}), 404
 
     return send_file(
-        job["output_path"],
+        clip["video_path"],
         mimetype="video/mp4",
         as_attachment=True,
-        download_name=f"video_{job_id}.mp4",
+        download_name=f"clip_{clip_id}.mp4",
     )
 
 
-@app.route("/api/preview/<job_id>")
-def preview(job_id):
-    """Stream video for preview."""
-    if job_id not in jobs:
-        return jsonify({"error": "Job not found"}), 404
+@app.route("/api/preview-clip/<clip_id>")
+def preview_clip(clip_id):
+    """Stream a clip for inline video playback."""
+    if clip_id not in clips:
+        return jsonify({"error": "Clip not found"}), 404
 
-    job = jobs[job_id]
+    clip = clips[clip_id]
 
-    if job["status"] != "completed":
-        return jsonify({"error": "Video not ready"}), 400
+    if clip["status"] != "completed":
+        return jsonify({"error": "Clip not ready"}), 400
 
-    if not job["output_path"] or not os.path.exists(job["output_path"]):
+    if not clip["video_path"] or not os.path.exists(clip["video_path"]):
         return jsonify({"error": "Video file not found"}), 404
 
-    return send_file(job["output_path"], mimetype="video/mp4")
+    return send_file(clip["video_path"], mimetype="video/mp4")
 
 
 if __name__ == "__main__":
-    # Ensure output directory exists
     os.makedirs(OUTPUT_DIR, exist_ok=True)
     app.run(debug=True, port=5000)

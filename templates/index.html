@@ -10,101 +10,28 @@
     <div class="container">
         <header>
             <h1>Sora Video Generator</h1>
-            <p class="subtitle">Create YouTube Shorts with AI-generated videos and narration</p>
+            <p class="subtitle">Create AI-generated video clips with Sora 2</p>
         </header>
 
-        <!-- Step 1: Text Input -->
-        <section id="step-input" class="step active">
-            <h2>1. Enter Scene Descriptions</h2>
-            <p class="hint">Describe each scene. Each sentence becomes a separate video clip.</p>
-            <textarea id="script-input" placeholder="Describe your scenes here. Each sentence = one clip. Example: A lone wolf walks through a snowy forest. The northern lights dance across the night sky. A cabin glows warmly in the distance."></textarea>
-
-            <div class="style-section">
-                <label for="global-style">Global Style / Vibe (applies to all clips)</label>
-                <textarea id="global-style" placeholder="e.g., Dark moody atmosphere, cinematic noir lighting, rainy city at night, neon reflections..."></textarea>
+        <div class="controls">
+            <div class="setting">
+                <label for="clip-count">Number of clips</label>
+                <select id="clip-count">
+                    <option value="1" selected>1 clip</option>
+                    <option value="2">2 clips</option>
+                    <option value="3">3 clips</option>
+                    <option value="4">4 clips</option>
+                    <option value="5">5 clips</option>
+                    <option value="6">6 clips</option>
+                    <option value="7">7 clips</option>
+                    <option value="8">8 clips</option>
+                    <option value="9">9 clips</option>
+                    <option value="10">10 clips</option>
+                </select>
             </div>
+        </div>
 
-            <div class="settings-row">
-                <div class="setting">
-                    <label for="clip-duration">Seconds per clip</label>
-                    <select id="clip-duration">
-                        <option value="4" selected>4 seconds</option>
-                        <option value="8">8 seconds</option>
-                        <option value="12">12 seconds</option>
-                    </select>
-                </div>
-                <div class="setting">
-                    <label for="max-clips">Max clips</label>
-                    <select id="max-clips">
-                        <option value="1">1 clip</option>
-                        <option value="2">2 clips</option>
-                        <option value="3">3 clips</option>
-                        <option value="4">4 clips</option>
-                        <option value="5" selected>5 clips</option>
-                        <option value="6">6 clips</option>
-                        <option value="8">8 clips</option>
-                        <option value="10">10 clips</option>
-                    </select>
-                </div>
-                <div class="setting cost-estimate">
-                    <label>Est. cost</label>
-                    <span id="cost-estimate">~$2.00</span>
-                </div>
-            </div>
-
-            <button id="process-btn" class="primary-btn">Process Text</button>
-        </section>
-
-        <!-- Step 2: Clip Editor -->
-        <section id="step-clips" class="step">
-            <h2>2. Review & Edit Clips</h2>
-            <div class="clips-info">
-                <span id="clips-count">0 clips</span>
-                <span id="estimated-duration">~0 seconds</span>
-            </div>
-
-            <div id="style-preview" class="style-preview">
-                <label>Global Style:</label>
-                <p id="style-text"></p>
-            </div>
-
-            <div id="clips-container"></div>
-            <div class="action-row">
-                <button id="back-btn" class="secondary-btn">Back</button>
-                <button id="generate-btn" class="primary-btn">Generate Video</button>
-            </div>
-        </section>
-
-        <!-- Step 3: Generation Progress -->
-        <section id="step-progress" class="step">
-            <h2>3. Generating Video</h2>
-            <div class="progress-container">
-                <div class="progress-bar">
-                    <div id="progress-fill" class="progress-fill"></div>
-                </div>
-                <p id="progress-text">Starting...</p>
-            </div>
-            <p class="hint">This may take several minutes. Please don't close the page.</p>
-        </section>
-
-        <!-- Step 4: Result -->
-        <section id="step-result" class="step">
-            <h2>4. Your Video is Ready!</h2>
-            <div class="video-preview">
-                <video id="preview-video" controls></video>
-            </div>
-            <div class="action-row">
-                <button id="download-btn" class="primary-btn">Download Video</button>
-                <button id="new-video-btn" class="secondary-btn">Create Another</button>
-            </div>
-        </section>
-
-        <!-- Error Display -->
-        <section id="error-section" class="step error-section">
-            <h2>Error</h2>
-            <p id="error-message"></p>
-            <button id="retry-btn" class="secondary-btn">Try Again</button>
-        </section>
+        <div id="storyboard" class="storyboard"></div>
     </div>
 
     <script src="/static/app.js"></script>

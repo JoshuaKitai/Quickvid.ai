@@ -1,172 +1,143 @@
 // State
-let currentClips = [];
-let currentJobId = null;
-let pollInterval = null;
-let globalStyle = '';
-let clipDuration = 4;
-let maxClips = 5;
+const COST_PER_SECOND = 0.10;
+let clips = []; // { prompt, duration, clipId, status, pollInterval }
 
-// Update cost estimate
-function updateCostEstimate() {
-    const duration = parseInt(document.getElementById('clip-duration').value);
-    const clips = parseInt(document.getElementById('max-clips').value);
-    const cost = (duration * clips * 0.10).toFixed(2);
-    document.getElementById('cost-estimate').textContent = `~$${cost}`;
-}
-
-// Add event listeners for settings
+// Initialize
 document.addEventListener('DOMContentLoaded', () => {
-    document.getElementById('clip-duration').addEventListener('change', updateCostEstimate);
-    document.getElementById('max-clips').addEventListener('change', updateCostEstimate);
-    updateCostEstimate();
+    document.getElementById('clip-count').addEventListener('change', (e) => {
+        updateStoryboard(parseInt(e.target.value));
+    });
+    updateStoryboard(1);
 });
 
-// DOM Elements
-const stepInput = document.getElementById('step-input');
-const stepClips = document.getElementById('step-clips');
-const stepProgress = document.getElementById('step-progress');
-const stepResult = document.getElementById('step-result');
-const errorSection = document.getElementById('error-section');
+// Render clip boxes into #storyboard, preserving existing prompts
+function updateStoryboard(count) {
+    const storyboard = document.getElementById('storyboard');
 
-const scriptInput = document.getElementById('script-input');
-const processBtn = document.getElementById('process-btn');
-const clipsContainer = document.getElementById('clips-container');
-const clipsCount = document.getElementById('clips-count');
-const estimatedDuration = document.getElementById('estimated-duration');
-const backBtn = document.getElementById('back-btn');
-const generateBtn = document.getElementById('generate-btn');
-const progressFill = document.getElementById('progress-fill');
-const progressText = document.getElementById('progress-text');
-const previewVideo = document.getElementById('preview-video');
-const downloadBtn = document.getElementById('download-btn');
-const newVideoBtn = document.getElementById('new-video-btn');
-const errorMessage = document.getElementById('error-message');
-const retryBtn = document.getElementById('retry-btn');
+    // Preserve existing clip data
+    const oldClips = [...clips];
 
-// Show specific step
-function showStep(stepElement) {
-    [stepInput, stepClips, stepProgress, stepResult, errorSection].forEach(el => {
-        el.classList.remove('active');
+    // Build new clips array
+    clips = [];
+    for (let i = 0; i < count; i++) {
+        if (i < oldClips.length) {
+            clips.push(oldClips[i]);
+        } else {
+            clips.push({ prompt: '', duration: 4, clipId: null, status: 'idle', pollInterval: null });
+        }
+    }
+
+    // Clear old poll intervals for removed clips
+    for (let i = count; i < oldClips.length; i++) {
+        if (oldClips[i].pollInterval) {
+            clearInterval(oldClips[i].pollInterval);
+        }
+    }
+
+    // Render
+    storyboard.innerHTML = '';
+    clips.forEach((clip, index) => {
+        const box = document.createElement('div');
+        box.className = 'clip-box';
+        if (clip.status === 'completed') box.classList.add('completed');
+        if (clip.status === 'failed') box.classList.add('failed');
+        if (clip.status === 'generating') box.classList.add('generating');
+
+        const cost = (clip.duration * COST_PER_SECOND).toFixed(2);
+
+        box.innerHTML = `
+            <div class="clip-header">
+                <span class="clip-number">Clip ${index + 1}</span>
+                <div class="clip-controls">
+                    <select class="clip-duration" data-index="${index}">
+                        <option value="4"${clip.duration === 4 ? ' selected' : ''}>4s</option>
+                        <option value="8"${clip.duration === 8 ? ' selected' : ''}>8s</option>
+                        <option value="12"${clip.duration === 12 ? ' selected' : ''}>12s</option>
+                    </select>
+                    <span class="clip-cost">$${cost}</span>
+                </div>
+            </div>
+            <textarea class="clip-prompt" data-index="${index}" placeholder="Describe this clip...">${clip.prompt}</textarea>
+            <div class="clip-actions">
+                <button class="primary-btn generate-clip-btn" data-index="${index}"${clip.status === 'generating' ? ' disabled' : ''}>
+                    ${clip.status === 'generating' ? 'Generating...' : 'Generate'}
+                </button>
+                ${clip.status === 'completed' && clip.clipId ? `<a href="/api/download-clip/${clip.clipId}" class="secondary-btn download-link">Download</a>` : ''}
+            </div>
+            <div class="clip-status-area" data-index="${index}">
+                ${renderStatusArea(clip)}
+            </div>
+        `;
+
+        storyboard.appendChild(box);
     });
-    stepElement.classList.add('active');
+
+    // Attach event listeners
+    document.querySelectorAll('.clip-duration').forEach(select => {
+        select.addEventListener('change', (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            clips[idx].duration = parseInt(e.target.value);
+            updateClipCost(idx);
+        });
+    });
+
+    document.querySelectorAll('.clip-prompt').forEach(textarea => {
+        textarea.addEventListener('input', (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            clips[idx].prompt = e.target.value;
+        });
+    });
+
+    document.querySelectorAll('.generate-clip-btn').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            generateClip(idx);
+        });
+    });
 }
 
-// Show error
-function showError(message) {
-    errorMessage.textContent = message;
-    showStep(errorSection);
+// Render the status area content for a clip
+function renderStatusArea(clip) {
+    switch (clip.status) {
+        case 'generating':
+            return '<div class="spinner"></div><p class="status-text">Generating video...</p>';
+        case 'completed':
+            return `<video controls src="/api/preview-clip/${clip.clipId}"></video>`;
+        case 'failed':
+            return `<p class="error-text">Error: ${clip.error || 'Generation failed'}</p>`;
+        default:
+            return '';
+    }
 }
 
-// Process text into clips
-async function processText() {
-    const text = scriptInput.value.trim();
-    if (!text) {
-        alert('Please enter some text');
+// Update the cost display for a clip
+function updateClipCost(index) {
+    const box = document.querySelectorAll('.clip-box')[index];
+    if (!box) return;
+    const cost = (clips[index].duration * COST_PER_SECOND).toFixed(2);
+    box.querySelector('.clip-cost').textContent = `$${cost}`;
+}
+
+// Generate a single clip
+async function generateClip(index) {
+    const clip = clips[index];
+    const prompt = clip.prompt.trim();
+
+    if (!prompt) {
+        alert('Please enter a prompt for this clip');
         return;
     }
 
-    globalStyle = document.getElementById('global-style').value.trim();
-    clipDuration = parseInt(document.getElementById('clip-duration').value);
-    maxClips = parseInt(document.getElementById('max-clips').value);
-
-    processBtn.disabled = true;
-    processBtn.textContent = 'Processing...';
+    clip.status = 'generating';
+    clip.error = null;
+    clip.clipId = null;
+    refreshClipBox(index);
 
     try {
-        const response = await fetch('/api/process-text', {
+        const response = await fetch('/api/generate-clip', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                text,
-                style: globalStyle,
-                clip_duration: clipDuration,
-                max_clips: maxClips
-            }),
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(data.error || 'Failed to process text');
-        }
-
-        currentClips = data.clips;
-        renderClips(data);
-        showStep(stepClips);
-    } catch (error) {
-        showError(error.message);
-    } finally {
-        processBtn.disabled = false;
-        processBtn.textContent = 'Process Text';
-    }
-}
-
-// Render clips in editor
-function renderClips(data) {
-    clipsCount.textContent = `${data.total_clips} clips`;
-    estimatedDuration.textContent = `~${data.estimated_duration} seconds`;
-
-    // Show global style if set
-    const stylePreview = document.getElementById('style-preview');
-    const styleText = document.getElementById('style-text');
-    if (globalStyle) {
-        styleText.textContent = globalStyle;
-        stylePreview.classList.remove('hidden');
-    } else {
-        stylePreview.classList.add('hidden');
-    }
-
-    clipsContainer.innerHTML = '';
-
-    data.clips.forEach((clip, index) => {
-        const card = document.createElement('div');
-        card.className = 'clip-card';
-        card.innerHTML = `
-            <div class="clip-header">
-                <span class="clip-number">Clip ${clip.id}</span>
-                <span class="clip-duration">${data.clip_duration}s</span>
-            </div>
-            <div class="clip-field">
-                <label>Scene Description</label>
-                <textarea data-clip-id="${clip.id}" data-field="visual_prompt">${clip.visual_prompt}</textarea>
-            </div>
-        `;
-        clipsContainer.appendChild(card);
-    });
-}
-
-// Get updated clips from editor
-function getUpdatedClips() {
-    const updated = [...currentClips];
-
-    document.querySelectorAll('.clip-card textarea').forEach(textarea => {
-        const clipId = parseInt(textarea.dataset.clipId);
-        const field = textarea.dataset.field;
-        const clip = updated.find(c => c.id === clipId);
-        if (clip) {
-            clip[field] = textarea.value;
-        }
-    });
-
-    return updated;
-}
-
-// Start video generation
-async function startGeneration() {
-    const clips = getUpdatedClips();
-
-    generateBtn.disabled = true;
-    generateBtn.textContent = 'Starting...';
-
-    try {
-        const response = await fetch('/api/generate', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                clips,
-                clip_duration: clipDuration,
-                global_style: globalStyle
-            }),
+            body: JSON.stringify({ prompt, duration: clip.duration }),
         });
 
         const data = await response.json();
@@ -175,117 +146,83 @@ async function startGeneration() {
             throw new Error(data.error || 'Failed to start generation');
         }
 
-        currentJobId = data.job_id;
-        showStep(stepProgress);
-        startPolling();
+        clip.clipId = data.clip_id;
+        startClipPolling(index);
     } catch (error) {
-        showError(error.message);
-    } finally {
-        generateBtn.disabled = false;
-        generateBtn.textContent = 'Generate Video';
+        clip.status = 'failed';
+        clip.error = error.message;
+        refreshClipBox(index);
     }
 }
 
-// Poll for job status
-function startPolling() {
-    progressFill.style.width = '0%';
-    progressText.textContent = 'Starting generation...';
+// Poll for a single clip's status
+function startClipPolling(index) {
+    const clip = clips[index];
 
-    pollInterval = setInterval(async () => {
+    clip.pollInterval = setInterval(async () => {
         try {
-            const response = await fetch(`/api/status/${currentJobId}`);
+            const response = await fetch(`/api/clip-status/${clip.clipId}`);
             const data = await response.json();
 
             if (!response.ok) {
                 throw new Error(data.error || 'Failed to get status');
             }
 
-            updateProgress(data);
-
             if (data.status === 'completed') {
-                stopPolling();
-                showResult();
+                clearInterval(clip.pollInterval);
+                clip.pollInterval = null;
+                clip.status = 'completed';
+                refreshClipBox(index);
             } else if (data.status === 'failed') {
-                stopPolling();
-                showError(data.error || 'Generation failed');
+                clearInterval(clip.pollInterval);
+                clip.pollInterval = null;
+                clip.status = 'failed';
+                clip.error = data.error || 'Generation failed';
+                refreshClipBox(index);
             }
         } catch (error) {
-            stopPolling();
-            showError(error.message);
+            clearInterval(clip.pollInterval);
+            clip.pollInterval = null;
+            clip.status = 'failed';
+            clip.error = error.message;
+            refreshClipBox(index);
         }
-    }, 2000);
+    }, 3000);
 }
 
-// Stop polling
-function stopPolling() {
-    if (pollInterval) {
-        clearInterval(pollInterval);
-        pollInterval = null;
-    }
-}
+// Refresh a single clip box in place without re-rendering the whole storyboard
+function refreshClipBox(index) {
+    const box = document.querySelectorAll('.clip-box')[index];
+    if (!box) return;
 
-// Update progress display
-function updateProgress(data) {
-    progressFill.style.width = `${data.progress}%`;
+    const clip = clips[index];
 
-    let statusText = '';
-    switch (data.status) {
-        case 'queued':
-            statusText = 'Waiting in queue...';
-            break;
-        case 'processing':
-            if (data.progress < 10) {
-                statusText = 'Analyzing story for consistency...';
-            } else {
-                statusText = 'Stitching clips together...';
-            }
-            break;
-        case 'generating':
-            statusText = `Generating clip ${data.current_clip} of ${data.total_clips}...`;
-            break;
-        default:
-            statusText = 'Working...';
-    }
-    progressText.textContent = statusText;
-}
+    // Update classes
+    box.classList.toggle('completed', clip.status === 'completed');
+    box.classList.toggle('failed', clip.status === 'failed');
+    box.classList.toggle('generating', clip.status === 'generating');
 
-// Show result
-function showResult() {
-    previewVideo.src = `/api/preview/${currentJobId}`;
-    showStep(stepResult);
-}
+    // Update button
+    const btn = box.querySelector('.generate-clip-btn');
+    btn.disabled = clip.status === 'generating';
+    btn.textContent = clip.status === 'generating' ? 'Generating...' : 'Generate';
 
-// Download video
-function downloadVideo() {
-    window.location.href = `/api/download/${currentJobId}`;
-}
-
-// Reset to start
-function resetApp() {
-    currentClips = [];
-    currentJobId = null;
-    globalStyle = '';
-    scriptInput.value = '';
-    document.getElementById('global-style').value = '';
-    previewVideo.src = '';
-    showStep(stepInput);
-}
-
-// Event listeners
-processBtn.addEventListener('click', processText);
-backBtn.addEventListener('click', () => showStep(stepInput));
-generateBtn.addEventListener('click', startGeneration);
-downloadBtn.addEventListener('click', downloadVideo);
-newVideoBtn.addEventListener('click', resetApp);
-retryBtn.addEventListener('click', resetApp);
-
-// Keyboard shortcut: Ctrl+Enter to process/generate
-document.addEventListener('keydown', (e) => {
-    if (e.ctrlKey && e.key === 'Enter') {
-        if (stepInput.classList.contains('active')) {
-            processText();
-        } else if (stepClips.classList.contains('active')) {
-            startGeneration();
+    // Update download link
+    const actions = box.querySelector('.clip-actions');
+    const existingLink = actions.querySelector('.download-link');
+    if (clip.status === 'completed' && clip.clipId) {
+        if (!existingLink) {
+            const link = document.createElement('a');
+            link.href = `/api/download-clip/${clip.clipId}`;
+            link.className = 'secondary-btn download-link';
+            link.textContent = 'Download';
+            actions.appendChild(link);
         }
+    } else if (existingLink) {
+        existingLink.remove();
     }
-});
+
+    // Update status area
+    const statusArea = box.querySelector('.clip-status-area');
+    statusArea.innerHTML = renderStatusArea(clip);
+}

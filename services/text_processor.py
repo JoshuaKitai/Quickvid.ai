@@ -79,17 +79,14 @@ def combine_sentences(sentences: List[str], target_count: int) -> List[str]:
 
 def generate_visual_prompt(scene_description: str, style: str = "") -> str:
     """
-    Generate a visual prompt from scene description and global style.
+    Generate a visual prompt from scene description.
+    Style is passed separately to the agent for context-aware enhancement.
 
     Args:
         scene_description: What this clip should show
-        style: Global style/vibe to apply to all clips
+        style: Unused - kept for API compatibility
     """
-    if style:
-        prompt = f"{style}. {scene_description}"
-    else:
-        prompt = f"Cinematic vertical video, high quality. {scene_description}"
-    return prompt
+    return scene_description
 
 
 def estimate_duration(clips: List[Dict], seconds_per_clip: int = 5) -> int:
