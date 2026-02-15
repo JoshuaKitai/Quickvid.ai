@@ -8,8 +8,8 @@ from config import OPENAI_API_KEY, OUTPUT_DIR
 class SoraClient:
     """Client for interacting with OpenAI's Sora 2 API."""
 
-    def __init__(self, clip_duration: int = 4):
-        self.client = OpenAI(api_key=OPENAI_API_KEY)
+    def __init__(self, clip_duration: int = 4, api_key: str = None):
+        self.client = OpenAI(api_key=api_key or OPENAI_API_KEY)
         self.model = "sora-2"
         # Vertical format for YouTube Shorts (9:16)
         # Valid sizes: 720x1280, 1280x720, 1024x1792, 1792x1024
@@ -17,13 +17,14 @@ class SoraClient:
         # Duration must be 4, 8, or 12
         self.clip_duration = clip_duration if clip_duration in [4, 8, 12] else 4
 
-    def generate_clip(self, clip: Dict, job_id: str) -> Dict:
+    def generate_clip(self, clip: Dict, job_id: str, reference_image_path: str = None) -> Dict:
         """
         Generate a single video clip using Sora 2.
 
         Args:
             clip: Dict with 'id', 'narration', and 'visual_prompt'
             job_id: Unique job identifier for organizing output
+            reference_image_path: Optional path to a reference image for visual consistency
 
         Returns:
             Dict with clip info and video path or error
@@ -31,13 +32,26 @@ class SoraClient:
         full_prompt = self._create_full_prompt(clip)
 
         try:
-            # Start video generation
-            response = self.client.videos.create(
+            # Build API kwargs
+            create_kwargs = dict(
                 model=self.model,
                 prompt=full_prompt,
                 size=self.resolution,
                 seconds=str(self.clip_duration),  # "4", "8", or "12"
             )
+
+            # Attach reference image if provided
+            ref_file = None
+            if reference_image_path and os.path.exists(reference_image_path):
+                ref_file = open(reference_image_path, "rb")
+                create_kwargs["input_reference"] = ref_file
+
+            # Start video generation
+            try:
+                response = self.client.videos.create(**create_kwargs)
+            finally:
+                if ref_file:
+                    ref_file.close()
 
             video_id = response.id
 

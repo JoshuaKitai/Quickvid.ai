@@ -1,6 +1,15 @@
 // State
 const COST_PER_SECOND = 0.10;
-let clips = []; // { prompt, duration, clipId, status, pollInterval }
+let clips = []; // { prompt, duration, clipId, status, pollInterval, referenceImage }
+
+// API Key helpers
+function getApiKey() {
+    return localStorage.getItem('openai_api_key') || '';
+}
+
+function setApiKey(key) {
+    localStorage.setItem('openai_api_key', key);
+}
 
 // Initialize
 document.addEventListener('DOMContentLoaded', () => {
@@ -8,6 +17,22 @@ document.addEventListener('DOMContentLoaded', () => {
         updateStoryboard(parseInt(e.target.value));
     });
     updateStoryboard(1);
+
+    // Load saved API key
+    const apiKeyInput = document.getElementById('api-key-input');
+    apiKeyInput.value = getApiKey();
+    apiKeyInput.addEventListener('input', (e) => {
+        setApiKey(e.target.value);
+    });
+
+    // Show/hide toggle
+    const toggleBtn = document.getElementById('api-key-toggle');
+    toggleBtn.addEventListener('click', () => {
+        const isPassword = apiKeyInput.type === 'password';
+        apiKeyInput.type = isPassword ? 'text' : 'password';
+        toggleBtn.querySelector('.eye-icon').style.display = isPassword ? 'none' : '';
+        toggleBtn.querySelector('.eye-off-icon').style.display = isPassword ? '' : 'none';
+    });
 });
 
 // Render clip boxes into #storyboard, preserving existing prompts
@@ -23,7 +48,7 @@ function updateStoryboard(count) {
         if (i < oldClips.length) {
             clips.push(oldClips[i]);
         } else {
-            clips.push({ prompt: '', duration: 4, clipId: null, status: 'idle', pollInterval: null });
+            clips.push({ prompt: '', duration: 4, clipId: null, status: 'idle', pollInterval: null, referenceImage: null });
         }
     }
 
@@ -58,6 +83,18 @@ function updateStoryboard(count) {
                 </div>
             </div>
             <textarea class="clip-prompt" data-index="${index}" placeholder="Describe this clip...">${clip.prompt}</textarea>
+            <div class="reference-image-area" data-index="${index}">
+                <label class="reference-upload-label">
+                    <input type="file" class="reference-input" data-index="${index}" accept="image/jpeg,image/png,image/webp" hidden>
+                    <span class="reference-upload-btn">+ Reference Image</span>
+                </label>
+                ${clip.referenceImage ? `
+                    <div class="reference-preview">
+                        <img class="reference-thumb" data-index="${index}" />
+                        <button class="reference-remove" data-index="${index}" title="Remove reference image">&times;</button>
+                    </div>
+                ` : ''}
+            </div>
             <div class="clip-actions">
                 <button class="primary-btn generate-clip-btn" data-index="${index}"${clip.status === 'generating' ? ' disabled' : ''}>
                     ${clip.status === 'generating' ? 'Generating...' : 'Generate'}
@@ -94,6 +131,36 @@ function updateStoryboard(count) {
             generateClip(idx);
         });
     });
+
+    // Reference image inputs
+    document.querySelectorAll('.reference-input').forEach(input => {
+        input.addEventListener('change', (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            const file = e.target.files[0];
+            if (file) {
+                clips[idx].referenceImage = file;
+                showReferencePreview(idx, file);
+            }
+        });
+    });
+
+    // Reference remove buttons
+    document.querySelectorAll('.reference-remove').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.preventDefault();
+            const idx = parseInt(e.target.dataset.index);
+            clips[idx].referenceImage = null;
+            refreshClipBox(idx);
+        });
+    });
+
+    // Load existing reference image thumbnails
+    document.querySelectorAll('.reference-thumb').forEach(img => {
+        const idx = parseInt(img.dataset.index);
+        if (clips[idx].referenceImage) {
+            img.src = URL.createObjectURL(clips[idx].referenceImage);
+        }
+    });
 }
 
 // Render the status area content for a clip
@@ -118,6 +185,41 @@ function updateClipCost(index) {
     box.querySelector('.clip-cost').textContent = `$${cost}`;
 }
 
+// Show a reference image preview thumbnail for a clip
+function showReferencePreview(index, file) {
+    const box = document.querySelectorAll('.clip-box')[index];
+    if (!box) return;
+    const area = box.querySelector('.reference-image-area');
+
+    // Remove existing preview if any
+    const existing = area.querySelector('.reference-preview');
+    if (existing) existing.remove();
+
+    const preview = document.createElement('div');
+    preview.className = 'reference-preview';
+
+    const img = document.createElement('img');
+    img.className = 'reference-thumb';
+    img.src = URL.createObjectURL(file);
+
+    const removeBtn = document.createElement('button');
+    removeBtn.className = 'reference-remove';
+    removeBtn.title = 'Remove reference image';
+    removeBtn.textContent = '\u00d7';
+    removeBtn.addEventListener('click', (e) => {
+        e.preventDefault();
+        clips[index].referenceImage = null;
+        preview.remove();
+        // Reset file input
+        const input = area.querySelector('.reference-input');
+        if (input) input.value = '';
+    });
+
+    preview.appendChild(img);
+    preview.appendChild(removeBtn);
+    area.appendChild(preview);
+}
+
 // Generate a single clip
 async function generateClip(index) {
     const clip = clips[index];
@@ -128,16 +230,32 @@ async function generateClip(index) {
         return;
     }
 
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        if (!confirm('No API key entered. The server will fall back to the .env key (if configured). Continue?')) {
+            return;
+        }
+    }
+
     clip.status = 'generating';
     clip.error = null;
     clip.clipId = null;
     refreshClipBox(index);
 
     try {
+        const formData = new FormData();
+        formData.append('prompt', prompt);
+        formData.append('duration', clip.duration);
+        if (apiKey) {
+            formData.append('api_key', apiKey);
+        }
+        if (clip.referenceImage) {
+            formData.append('reference_image', clip.referenceImage);
+        }
+
         const response = await fetch('/api/generate-clip', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ prompt, duration: clip.duration }),
+            body: formData,
         });
 
         const data = await response.json();
@@ -220,6 +338,17 @@ function refreshClipBox(index) {
         }
     } else if (existingLink) {
         existingLink.remove();
+    }
+
+    // Update reference image area
+    const refArea = box.querySelector('.reference-image-area');
+    const existingPreview = refArea ? refArea.querySelector('.reference-preview') : null;
+    if (clip.referenceImage && refArea && !existingPreview) {
+        showReferencePreview(index, clip.referenceImage);
+    } else if (!clip.referenceImage && existingPreview) {
+        existingPreview.remove();
+        const input = refArea.querySelector('.reference-input');
+        if (input) input.value = '';
     }
 
     // Update status area

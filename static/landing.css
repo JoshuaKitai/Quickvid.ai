@@ -1,0 +1,305 @@
+/* ── Landing Page Styles ── */
+
+/* Navbar */
+.navbar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 60px;
+    background: rgba(0, 0, 0, 0.85);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 2rem;
+    z-index: 1000;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.nav-brand {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    text-decoration: none;
+    color: #ddd;
+    font-weight: 700;
+    font-size: 1.15rem;
+    cursor: pointer;
+}
+
+.nav-brand svg {
+    width: 24px;
+    height: 24px;
+}
+
+.nav-links {
+    display: flex;
+    gap: 2rem;
+    list-style: none;
+}
+
+.nav-links a {
+    color: #999;
+    text-decoration: none;
+    font-size: 0.9rem;
+    font-weight: 400;
+    transition: color 0.2s;
+    cursor: pointer;
+}
+
+.nav-links a:hover {
+    color: #ddd;
+}
+
+.nav-socials {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+}
+
+.nav-socials a {
+    color: #666;
+    transition: color 0.2s;
+    display: flex;
+    align-items: center;
+}
+
+.nav-socials a:hover {
+    color: #ddd;
+}
+
+.nav-socials svg {
+    width: 20px;
+    height: 20px;
+}
+
+/* Landing wrapper */
+#landing {
+    opacity: 1;
+    transition: opacity 0.3s ease;
+}
+
+#landing.fade-out {
+    opacity: 0;
+}
+
+/* Hero */
+.hero {
+    min-height: 100vh;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    text-align: center;
+    padding: 0 2rem;
+}
+
+.hero h1 {
+    font-size: clamp(3rem, 8vw, 5.5rem);
+    font-weight: 700;
+    color: #ddd;
+    line-height: 1.1;
+    margin-bottom: 1rem;
+}
+
+.hero p {
+    font-size: 1.2rem;
+    color: #888;
+    max-width: 600px;
+    margin-bottom: 2.5rem;
+    line-height: 1.6;
+}
+
+.hero-btn {
+    padding: 1.1rem 3.2rem;
+    font-size: 1.15rem;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    border: none;
+    border-radius: 8px;
+    background: #e0e0e0;
+    color: #111;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.hero-btn:hover {
+    background: #7ec8e3;
+    transform: translateY(-2px);
+}
+
+/* How It Works */
+.how-it-works {
+    padding: 6rem 2rem;
+    max-width: 1100px;
+    margin: 0 auto;
+}
+
+.how-it-works h2 {
+    text-align: center;
+    font-size: 2.6rem;
+    font-weight: 600;
+    color: #ddd;
+    margin-bottom: 3.5rem;
+}
+
+.steps-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2rem;
+}
+
+.step-card {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 14px;
+    padding: 2.8rem 2rem;
+    text-align: center;
+}
+
+.step-number {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    color: #7ec8e3;
+    font-weight: 700;
+    font-size: 1.15rem;
+    margin-bottom: 1.5rem;
+}
+
+.step-card h3 {
+    font-size: 1.3rem;
+    font-weight: 600;
+    color: #ddd;
+    margin-bottom: 0.85rem;
+}
+
+.step-card p {
+    font-size: 1rem;
+    color: #888;
+    line-height: 1.6;
+}
+
+/* Examples */
+.examples {
+    padding: 6rem 2rem;
+    max-width: 1200px;
+    margin: 0 auto;
+}
+
+.examples h2 {
+    text-align: center;
+    font-size: 2.6rem;
+    font-weight: 600;
+    color: #ddd;
+    margin-bottom: 3.5rem;
+}
+
+.examples-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 2.5rem;
+}
+
+.example-video {
+    aspect-ratio: 9 / 16;
+    width: 100%;
+    object-fit: cover;
+    border-radius: 12px;
+    background: #111;
+    border: 1px solid #222;
+}
+
+/* CTA */
+.cta {
+    padding: 7rem 2rem;
+    text-align: center;
+}
+
+.cta h2 {
+    font-size: 2.8rem;
+    font-weight: 600;
+    color: #ddd;
+    margin-bottom: 2.5rem;
+}
+
+.cta-btn {
+    padding: 1.1rem 3.2rem;
+    font-size: 1.15rem;
+    font-family: 'Roboto', sans-serif;
+    font-weight: 500;
+    border: none;
+    border-radius: 8px;
+    background: #e0e0e0;
+    color: #111;
+    cursor: pointer;
+    transition: background 0.2s, transform 0.2s;
+}
+
+.cta-btn:hover {
+    background: #7ec8e3;
+    transform: translateY(-2px);
+}
+
+/* App mode: body class toggles */
+body {
+    background: #000;
+    font-family: 'Roboto', -apple-system, BlinkMacSystemFont, 'Segoe UI', Oxygen, Ubuntu, sans-serif;
+    font-size: 17px;
+    color: #ccc;
+    padding-top: 60px;
+}
+
+body.app-mode {
+    background: #000;
+}
+
+body.app-mode #landing {
+    display: none;
+}
+
+body.app-mode #app {
+    display: block !important;
+}
+
+/* Copy tooltip */
+.copy-tooltip {
+    position: fixed;
+    background: #222;
+    color: #ddd;
+    padding: 6px 12px;
+    border-radius: 6px;
+    font-size: 0.8rem;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    z-index: 9999;
+    transform: translate(-50%, -120%);
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+    .steps-grid,
+    .examples-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .nav-links {
+        display: none;
+    }
+
+    .navbar {
+        padding: 0 1rem;
+    }
+
+    .hero h1 {
+        font-size: clamp(2rem, 10vw, 3.5rem);
+    }
+}
