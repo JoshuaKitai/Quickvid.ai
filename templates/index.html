@@ -89,6 +89,16 @@
             <h2>Ready to create?</h2>
             <button class="cta-btn" data-action="get-started">Get Started</button>
         </section>
+
+        <section class="docs-footer">
+            <div class="docs-links">
+                <a href="https://platform.openai.com/docs/guides/video-generation" target="_blank" rel="noopener">Sora 2 Video Generation Guide</a>
+                <span class="docs-divider"></span>
+                <a href="https://platform.openai.com/docs/models/sora-2" target="_blank" rel="noopener">Sora 2 Model Reference</a>
+                <span class="docs-divider"></span>
+                <a href="https://platform.openai.com/docs/api-reference" target="_blank" rel="noopener">OpenAI API Reference</a>
+            </div>
+        </section>
     </div>
 
     <!-- App (hidden until "Get Started") -->
@@ -124,24 +134,82 @@
 
             <main class="main-content">
                 <div class="controls">
-                    <div class="setting">
-                        <label for="clip-count">Number of clips</label>
-                        <select id="clip-count">
-                            <option value="1" selected>1 clip</option>
-                            <option value="2">2 clips</option>
-                            <option value="3">3 clips</option>
-                            <option value="4">4 clips</option>
-                            <option value="5">5 clips</option>
-                            <option value="6">6 clips</option>
-                            <option value="7">7 clips</option>
-                            <option value="8">8 clips</option>
-                            <option value="9">9 clips</option>
-                            <option value="10">10 clips</option>
-                        </select>
+                    <div class="mode-toggle">
+                        <button class="mode-tab active" data-mode="manual">Manual</button>
+                        <button class="mode-tab" data-mode="ai">AI Generate</button>
+                    </div>
+                    <div class="manual-controls">
+                        <div class="setting">
+                            <label for="clip-count">Number of clips</label>
+                            <select id="clip-count">
+                                <option value="1" selected>1 clip</option>
+                                <option value="2">2 clips</option>
+                                <option value="3">3 clips</option>
+                                <option value="4">4 clips</option>
+                                <option value="5">5 clips</option>
+                                <option value="6">6 clips</option>
+                                <option value="7">7 clips</option>
+                                <option value="8">8 clips</option>
+                                <option value="9">9 clips</option>
+                                <option value="10">10 clips</option>
+                            </select>
+                        </div>
                     </div>
                 </div>
 
                 <div id="storyboard" class="storyboard"></div>
+
+                <div id="ai-panel" class="ai-panel" style="display:none">
+                    <div class="ai-section">
+                        <label class="ai-label">Describe your video</label>
+                        <textarea id="ai-description" class="ai-description" placeholder="Paste a paragraph describing the video you want to create..."></textarea>
+                    </div>
+
+                    <div class="ai-section">
+                        <label class="ai-label">Model</label>
+                        <div class="btn-group" id="ai-model-group">
+                            <button class="btn-option active" data-value="sora-2">Sora 2</button>
+                            <button class="btn-option" data-value="sora-2-pro">Sora 2 Pro</button>
+                        </div>
+                    </div>
+
+                    <div class="ai-section">
+                        <label class="ai-label">Number of clips</label>
+                        <div class="btn-group" id="ai-clip-count-group">
+                            <button class="btn-option" data-value="2">2</button>
+                            <button class="btn-option active" data-value="3">3</button>
+                            <button class="btn-option" data-value="4">4</button>
+                            <button class="btn-option" data-value="5">5</button>
+                            <button class="btn-option" data-value="6">6</button>
+                            <button class="btn-option" data-value="7">7</button>
+                            <button class="btn-option" data-value="8">8</button>
+                            <button class="btn-option" data-value="9">9</button>
+                            <button class="btn-option" data-value="10">10</button>
+                        </div>
+                    </div>
+
+                    <div class="ai-section">
+                        <label class="ai-label">Duration per clip</label>
+                        <div class="btn-group" id="ai-duration-group">
+                            <button class="btn-option active" data-value="4">4s</button>
+                            <button class="btn-option" data-value="8">8s</button>
+                            <button class="btn-option" data-value="12">12s</button>
+                        </div>
+                    </div>
+
+                    <div class="ai-section ai-actions">
+                        <span class="ai-cost" id="ai-cost">Estimated cost: $1.20</span>
+                        <button class="primary-btn" id="ai-generate-prompts-btn">Generate Script</button>
+                    </div>
+
+                    <div id="ai-prompts-area" class="ai-prompts-area" style="display:none">
+                        <h3 class="ai-prompts-heading">Generated Prompts</h3>
+                        <div id="ai-prompts-list"></div>
+                        <div class="ai-actions">
+                            <button class="primary-btn" id="ai-generate-all-btn">Generate All Videos</button>
+                        </div>
+                    </div>
+                </div>
             </main>
         </div>
     </div>

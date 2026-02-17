@@ -413,6 +413,188 @@ button {
     to { transform: rotate(360deg); }
 }
 
+/* Mode Toggle */
+.mode-toggle {
+    display: flex;
+    gap: 0;
+    margin-bottom: 1.5rem;
+    background: #000;
+    border-radius: 8px;
+    border: 1px solid #222;
+    overflow: hidden;
+    width: fit-content;
+}
+
+.mode-tab {
+    padding: 0.6rem 1.5rem;
+    background: transparent;
+    color: #888;
+    border: none;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.mode-tab.active {
+    background: #222;
+    color: #ddd;
+}
+
+.mode-tab:hover:not(.active) {
+    color: #aaa;
+}
+
+/* Button Groups */
+.btn-group {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+}
+
+.btn-option {
+    padding: 0.5rem 1rem;
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 6px;
+    color: #888;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+.btn-option.active {
+    background: #222;
+    border-color: #ddd;
+    color: #ddd;
+}
+
+.btn-option:hover:not(.active) {
+    border-color: #555;
+    color: #aaa;
+}
+
+/* AI Panel */
+.ai-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.ai-section { }
+
+.ai-label {
+    display: block;
+    font-size: 0.85rem;
+    color: #888;
+    margin-bottom: 0.75rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    font-weight: 600;
+}
+
+.ai-description {
+    width: 100%;
+    min-height: 160px;
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 1rem;
+    color: #fff;
+    font-size: 0.95rem;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.ai-description:focus {
+    outline: none;
+    border-color: #555;
+}
+
+.ai-description::placeholder {
+    color: #555;
+}
+
+.ai-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.ai-cost {
+    color: #888;
+    font-size: 0.9rem;
+}
+
+/* AI Prompt Cards */
+.ai-prompts-area {
+    margin-top: 1rem;
+}
+
+.ai-prompts-heading {
+    color: #ddd;
+    font-size: 1.1rem;
+    margin-bottom: 1.25rem;
+}
+
+.ai-prompt-card {
+    background: #111;
+    border: 1px solid #222;
+    border-radius: 10px;
+    padding: 1.25rem;
+    margin-bottom: 1rem;
+    transition: border-color 0.3s;
+}
+
+.ai-prompt-card.generating { border-color: #ddd; }
+.ai-prompt-card.completed { border-color: #4caf50; }
+.ai-prompt-card.failed { border-color: #ff4444; }
+
+.ai-prompt-header {
+    display: flex;
+    justify-content: space-between;
+    margin-bottom: 0.75rem;
+    color: #ddd;
+    font-weight: 600;
+}
+
+.ai-prompt-text {
+    width: 100%;
+    min-height: 80px;
+    background: #000;
+    border: 1px solid #222;
+    border-radius: 6px;
+    padding: 0.75rem;
+    color: #fff;
+    font-size: 0.9rem;
+    font-family: inherit;
+    resize: vertical;
+}
+
+.ai-prompt-text:focus {
+    outline: none;
+    border-color: #555;
+}
+
+.ai-clip-status {
+    margin-top: 1rem;
+    text-align: center;
+}
+
+.ai-clip-status:empty {
+    margin-top: 0;
+}
+
+.ai-clip-status video {
+    max-width: 100%;
+    max-height: 400px;
+    border-radius: 8px;
+    background: #000;
+}
+
+.ai-clip-actions {
+    margin-top: 0.75rem;
+}
+
 /* Scrollbar styling */
 ::-webkit-scrollbar {
     width: 8px;

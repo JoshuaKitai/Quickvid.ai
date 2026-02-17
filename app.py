@@ -4,6 +4,7 @@ import threading
 from flask import Flask, render_template, request, jsonify, send_file
 from PIL import Image
 from services.sora_client import SoraClient
+from services.story_processor import StoryProcessor
 from config import OUTPUT_DIR, VIDEO_WIDTH, VIDEO_HEIGHT
 
 app = Flask(__name__)
@@ -39,18 +40,21 @@ def generate_clip():
         duration = int(request.form.get("duration", 4))
         ref_file = request.files.get("reference_image")
         api_key = (request.form.get("api_key") or "").strip() or None
+        model = (request.form.get("model") or "sora-2").strip()
     else:
         data = request.get_json()
         prompt = data.get("prompt", "").strip()
         duration = data.get("duration", 4)
         ref_file = None
         api_key = (data.get("api_key") or "").strip() or None
+        model = data.get("model", "sora-2")
 
     if not prompt:
         return jsonify({"error": "No prompt provided"}), 400
 
-    if duration not in [4, 8, 12]:
-        return jsonify({"error": "Duration must be 4, 8, or 12"}), 400
+    valid_durations = SoraClient.VALID_DURATIONS.get(model, [4, 8, 12])
+    if duration not in valid_durations:
+        return jsonify({"error": f"Duration must be one of {valid_durations} for {model}"}), 400
 
     clip_id = str(uuid.uuid4())[:8]
 
@@ -75,17 +79,17 @@ def generate_clip():
 
     thread = threading.Thread(
         target=_run_clip_generation,
-        args=(clip_id, prompt, duration, reference_image_path, api_key),
+        args=(clip_id, prompt, duration, reference_image_path, api_key, model),
     )
     thread.start()
 
     return jsonify({"clip_id": clip_id, "status": "generating"})
 
 
-def _run_clip_generation(clip_id: str, prompt: str, duration: int, reference_image_path: str = None, api_key: str = None):
+def _run_clip_generation(clip_id: str, prompt: str, duration: int, reference_image_path: str = None, api_key: str = None, model: str = "sora-2"):
     """Generate a single clip in a background thread."""
     try:
-        sora = SoraClient(clip_duration=duration, api_key=api_key)
+        sora = SoraClient(clip_duration=duration, api_key=api_key, model=model)
         clip_data = {"id": 1, "visual_prompt": prompt}
         result = sora.generate_clip(clip_data, clip_id, reference_image_path=reference_image_path)
 
@@ -98,6 +102,34 @@ def _run_clip_generation(clip_id: str, prompt: str, duration: int, reference_ima
     except Exception as e:
         clips[clip_id]["status"] = "failed"
         clips[clip_id]["error"] = str(e)
+
+
+@app.route("/api/ai-generate-prompts", methods=["POST"])
+def ai_generate_prompts():
+    """Generate AI prompts from a video description."""
+    data = request.get_json()
+    description = (data.get("description") or "").strip()
+    clip_count = data.get("clip_count", 3)
+    duration = data.get("duration", 4)
+    api_key = (data.get("api_key") or "").strip() or None
+    model = data.get("model", "sora-2")
+
+    if not description:
+        return jsonify({"error": "No description provided"}), 400
+
+    if not isinstance(clip_count, int) or clip_count < 1 or clip_count > 10:
+        return jsonify({"error": "Clip count must be between 1 and 10"}), 400
+
+    valid_durations = SoraClient.VALID_DURATIONS.get(model, [4, 8, 12])
+    if duration not in valid_durations:
+        return jsonify({"error": f"Duration must be one of {valid_durations} for {model}"}), 400
+
+    try:
+        processor = StoryProcessor(api_key=api_key)
+        prompts = processor.generate_prompts_from_description(description, clip_count, duration)
+        return jsonify({"prompts": prompts})
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
 
 
 @app.route("/api/clip-status/<clip_id>")

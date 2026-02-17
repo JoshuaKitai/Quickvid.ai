@@ -8,14 +8,19 @@ from config import OPENAI_API_KEY, OUTPUT_DIR
 class SoraClient:
     """Client for interacting with OpenAI's Sora 2 API."""
 
-    def __init__(self, clip_duration: int = 4, api_key: str = None):
+    VALID_DURATIONS = {
+        "sora-2": [4, 8, 12],
+        "sora-2-pro": [10, 15, 25],
+    }
+
+    def __init__(self, clip_duration: int = 4, api_key: str = None, model: str = "sora-2"):
         self.client = OpenAI(api_key=api_key or OPENAI_API_KEY)
-        self.model = "sora-2"
+        self.model = model if model in self.VALID_DURATIONS else "sora-2"
         # Vertical format for YouTube Shorts (9:16)
         # Valid sizes: 720x1280, 1280x720, 1024x1792, 1792x1024
         self.resolution = "720x1280"
-        # Duration must be 4, 8, or 12
-        self.clip_duration = clip_duration if clip_duration in [4, 8, 12] else 4
+        valid = self.VALID_DURATIONS[self.model]
+        self.clip_duration = clip_duration if clip_duration in valid else valid[0]
 
     def generate_clip(self, clip: Dict, job_id: str, reference_image_path: str = None) -> Dict:
         """

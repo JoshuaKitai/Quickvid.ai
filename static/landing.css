@@ -107,7 +107,7 @@
 .hero p {
     font-size: 1.2rem;
     color: #888;
-    max-width: 600px;
+    max-width: 700px;
     margin-bottom: 2.5rem;
     line-height: 1.6;
 }
@@ -133,7 +133,7 @@
 /* How It Works */
 .how-it-works {
     padding: 6rem 2rem;
-    max-width: 1100px;
+    max-width: 1400px;
     margin: 0 auto;
 }
 
@@ -190,7 +190,7 @@
 /* Examples */
 .examples {
     padding: 6rem 2rem;
-    max-width: 1200px;
+    max-width: 1400px;
     margin: 0 auto;
 }
 
@@ -205,14 +205,14 @@
 .examples-grid {
     display: grid;
     grid-template-columns: repeat(3, 1fr);
-    gap: 2.5rem;
+    gap: 3.5rem;
 }
 
 .example-video {
     aspect-ratio: 9 / 16;
     width: 100%;
     object-fit: cover;
-    border-radius: 12px;
+    border-radius: 14px;
     background: #111;
     border: 1px solid #222;
 }
@@ -284,6 +284,39 @@ body.app-mode #app {
     transform: translate(-50%, -120%);
 }
 
+/* Docs Footer */
+.docs-footer {
+    padding: 3rem 2rem 4rem;
+    text-align: center;
+    border-top: 1px solid #222;
+}
+
+.docs-links {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+}
+
+.docs-links a {
+    color: #666;
+    text-decoration: none;
+    font-size: 0.85rem;
+    transition: color 0.2s;
+}
+
+.docs-links a:hover {
+    color: #ddd;
+}
+
+.docs-divider {
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: #333;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
     .steps-grid,
@@ -301,5 +334,9 @@ body.app-mode #app {
 
     .hero h1 {
         font-size: clamp(2rem, 10vw, 3.5rem);
+    }
+
+    .docs-divider {
+        display: none;
     }
 }

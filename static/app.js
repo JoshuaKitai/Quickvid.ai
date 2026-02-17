@@ -2,6 +2,21 @@
 const COST_PER_SECOND = 0.10;
 let clips = []; // { prompt, duration, clipId, status, pollInterval, referenceImage }
 
+// AI Mode State
+let aiState = {
+    model: 'sora-2',
+    clipCount: 3,
+    duration: 4,
+    prompts: [],
+    clips: [],       // { prompt, clipId, status, pollInterval, error }
+    mode: 'manual'
+};
+
+const DURATION_OPTIONS = {
+    'sora-2': [4, 8, 12],
+    'sora-2-pro': [10, 15, 25]
+};
+
 // API Key helpers
 function getApiKey() {
     return localStorage.getItem('openai_api_key') || '';
@@ -33,7 +48,305 @@ document.addEventListener('DOMContentLoaded', () => {
         toggleBtn.querySelector('.eye-icon').style.display = isPassword ? 'none' : '';
         toggleBtn.querySelector('.eye-off-icon').style.display = isPassword ? '' : 'none';
     });
+
+    // Mode toggle
+    document.querySelectorAll('.mode-tab').forEach(tab => {
+        tab.addEventListener('click', () => {
+            document.querySelectorAll('.mode-tab').forEach(t => t.classList.remove('active'));
+            tab.classList.add('active');
+            const mode = tab.dataset.mode;
+            aiState.mode = mode;
+
+            const manualControls = document.querySelector('.manual-controls');
+            const storyboard = document.getElementById('storyboard');
+            const aiPanel = document.getElementById('ai-panel');
+
+            if (mode === 'manual') {
+                manualControls.style.display = '';
+                storyboard.style.display = '';
+                aiPanel.style.display = 'none';
+            } else {
+                manualControls.style.display = 'none';
+                storyboard.style.display = 'none';
+                aiPanel.style.display = '';
+            }
+        });
+    });
+
+    // Button group behavior
+    initButtonGroup('ai-model-group', (value) => {
+        aiState.model = value;
+        updateDurationButtons();
+        updateAiCost();
+    });
+
+    initButtonGroup('ai-clip-count-group', (value) => {
+        aiState.clipCount = parseInt(value);
+        updateAiCost();
+    });
+
+    initButtonGroup('ai-duration-group', (value) => {
+        aiState.duration = parseInt(value);
+        updateAiCost();
+    });
+
+    // Generate Script button
+    document.getElementById('ai-generate-prompts-btn').addEventListener('click', generateScript);
+
+    // Generate All Videos button
+    document.getElementById('ai-generate-all-btn').addEventListener('click', generateAllVideos);
+
+    // Initial cost
+    updateAiCost();
 });
+
+// Generic button group initializer
+function initButtonGroup(groupId, onChange) {
+    const group = document.getElementById(groupId);
+    if (!group) return;
+    group.addEventListener('click', (e) => {
+        const btn = e.target.closest('.btn-option');
+        if (!btn) return;
+        group.querySelectorAll('.btn-option').forEach(b => b.classList.remove('active'));
+        btn.classList.add('active');
+        onChange(btn.dataset.value);
+    });
+}
+
+// Update duration buttons when model changes
+function updateDurationButtons() {
+    const group = document.getElementById('ai-duration-group');
+    const durations = DURATION_OPTIONS[aiState.model];
+    group.innerHTML = durations.map((d, i) =>
+        `<button class="btn-option${i === 0 ? ' active' : ''}" data-value="${d}">${d}s</button>`
+    ).join('');
+    aiState.duration = durations[0];
+}
+
+// Update AI cost display
+function updateAiCost() {
+    const cost = (aiState.clipCount * aiState.duration * COST_PER_SECOND).toFixed(2);
+    document.getElementById('ai-cost').textContent = `Estimated cost: $${cost}`;
+}
+
+// Generate Script (AI prompts from description)
+async function generateScript() {
+    const description = document.getElementById('ai-description').value.trim();
+    if (!description) {
+        alert('Please describe your video first');
+        return;
+    }
+
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        if (!confirm('No API key entered. The server will fall back to the .env key (if configured). Continue?')) {
+            return;
+        }
+    }
+
+    const btn = document.getElementById('ai-generate-prompts-btn');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    try {
+        const response = await fetch('/api/ai-generate-prompts', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+                description,
+                clip_count: aiState.clipCount,
+                duration: aiState.duration,
+                api_key: apiKey || undefined,
+                model: aiState.model
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(data.error || 'Failed to generate prompts');
+        }
+
+        aiState.prompts = data.prompts;
+        aiState.clips = data.prompts.map(prompt => ({
+            prompt,
+            clipId: null,
+            status: 'idle',
+            pollInterval: null,
+            error: null
+        }));
+
+        renderPromptCards();
+
+        document.getElementById('ai-prompts-area').style.display = '';
+    } catch (error) {
+        alert('Error: ' + error.message);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Generate Script';
+    }
+}
+
+// Render AI prompt cards
+function renderPromptCards() {
+    const list = document.getElementById('ai-prompts-list');
+    list.innerHTML = '';
+
+    aiState.clips.forEach((clip, index) => {
+        const cost = (aiState.duration * COST_PER_SECOND).toFixed(2);
+        const card = document.createElement('div');
+        card.className = 'ai-prompt-card';
+        if (clip.status === 'generating') card.classList.add('generating');
+        if (clip.status === 'completed') card.classList.add('completed');
+        if (clip.status === 'failed') card.classList.add('failed');
+
+        card.innerHTML = `
+            <div class="ai-prompt-header">
+                <span>Clip ${index + 1}</span>
+                <span class="clip-cost">$${cost}</span>
+            </div>
+            <textarea class="ai-prompt-text" data-index="${index}">${clip.prompt}</textarea>
+            <div class="ai-clip-status" data-index="${index}">
+                ${renderAiClipStatus(clip)}
+            </div>
+        `;
+
+        list.appendChild(card);
+    });
+
+    // Attach textarea change listeners
+    list.querySelectorAll('.ai-prompt-text').forEach(textarea => {
+        textarea.addEventListener('input', (e) => {
+            const idx = parseInt(e.target.dataset.index);
+            aiState.clips[idx].prompt = e.target.value;
+        });
+    });
+}
+
+// Render status for an AI clip
+function renderAiClipStatus(clip) {
+    switch (clip.status) {
+        case 'generating':
+            return '<div class="spinner"></div><p class="status-text">Generating video...</p>';
+        case 'completed':
+            return `
+                <video controls src="/api/preview-clip/${clip.clipId}"></video>
+                <div class="ai-clip-actions">
+                    <a href="/api/download-clip/${clip.clipId}" class="secondary-btn download-link">Download</a>
+                </div>`;
+        case 'failed':
+            return `<p class="error-text">Error: ${clip.error || 'Generation failed'}</p>`;
+        default:
+            return '';
+    }
+}
+
+// Refresh a single AI prompt card in place
+function refreshAiCard(index) {
+    const cards = document.querySelectorAll('.ai-prompt-card');
+    const card = cards[index];
+    if (!card) return;
+
+    const clip = aiState.clips[index];
+
+    card.classList.toggle('generating', clip.status === 'generating');
+    card.classList.toggle('completed', clip.status === 'completed');
+    card.classList.toggle('failed', clip.status === 'failed');
+
+    const statusArea = card.querySelector('.ai-clip-status');
+    statusArea.innerHTML = renderAiClipStatus(clip);
+}
+
+// Generate All Videos
+async function generateAllVideos() {
+    const apiKey = getApiKey();
+    if (!apiKey) {
+        if (!confirm('No API key entered. The server will fall back to the .env key (if configured). Continue?')) {
+            return;
+        }
+    }
+
+    const btn = document.getElementById('ai-generate-all-btn');
+    btn.disabled = true;
+    btn.textContent = 'Generating...';
+
+    for (let i = 0; i < aiState.clips.length; i++) {
+        const clip = aiState.clips[i];
+        if (clip.status === 'completed') continue;
+
+        const prompt = clip.prompt.trim();
+        if (!prompt) continue;
+
+        clip.status = 'generating';
+        clip.error = null;
+        clip.clipId = null;
+        refreshAiCard(i);
+
+        try {
+            const response = await fetch('/api/generate-clip', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    prompt,
+                    duration: aiState.duration,
+                    api_key: apiKey || undefined,
+                    model: aiState.model
+                })
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to start generation');
+            }
+
+            clip.clipId = data.clip_id;
+            startAiClipPolling(i);
+        } catch (error) {
+            clip.status = 'failed';
+            clip.error = error.message;
+            refreshAiCard(i);
+        }
+    }
+
+    btn.disabled = false;
+    btn.textContent = 'Generate All Videos';
+}
+
+// Poll for a single AI clip's status
+function startAiClipPolling(index) {
+    const clip = aiState.clips[index];
+
+    clip.pollInterval = setInterval(async () => {
+        try {
+            const response = await fetch(`/api/clip-status/${clip.clipId}`);
+            const data = await response.json();
+
+            if (!response.ok) {
+                throw new Error(data.error || 'Failed to get status');
+            }
+
+            if (data.status === 'completed') {
+                clearInterval(clip.pollInterval);
+                clip.pollInterval = null;
+                clip.status = 'completed';
+                refreshAiCard(index);
+            } else if (data.status === 'failed') {
+                clearInterval(clip.pollInterval);
+                clip.pollInterval = null;
+                clip.status = 'failed';
+                clip.error = data.error || 'Generation failed';
+                refreshAiCard(index);
+            }
+        } catch (error) {
+            clearInterval(clip.pollInterval);
+            clip.pollInterval = null;
+            clip.status = 'failed';
+            clip.error = error.message;
+            refreshAiCard(index);
+        }
+    }, 3000);
+}
 
 // Render clip boxes into #storyboard, preserving existing prompts
 function updateStoryboard(count) {
